@@ -1,513 +1,107 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hotelix – Chatbot de recommandation d’hôtels</title>
-
-    <!-- CSS intégré dans le fichier HTML -->
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        .sr-only {
-            position: absolute;
-            width: 1px;
-            height: 1px;
-            padding: 0;
-            margin: -1px;
-            overflow: hidden;
-            clip: rect(0, 0, 0, 0);
-            white-space: nowrap;
-            border: 0;
-        }
-
-        body {
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-            background: radial-gradient(circle at top, #8b5cf6 0, #0f172a 55%, #020617 100%);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 32px;
-            color: #e5e7eb;
-        }
-
-        .container {
-            width: 100%;
-            max-width: 980px;
-            display: grid;
-            grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-            gap: 32px;
-            align-items: stretch;
-        }
-
-        .hero {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            gap: 16px;
-        }
-
-        .hero-title {
-            font-size: 34px;
-            font-weight: 800;
-            letter-spacing: 0.03em;
-        }
-
-        .hero-subtitle {
-            font-size: 15px;
-            color: #e5e7eb;
-            max-width: 420px;
-        }
-
-        .hero-badges {
-            margin-top: 6px;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-
-        .hero-badge {
-            padding: 6px 12px;
-            border-radius: 999px;
-            background: rgba(15, 23, 42, 0.7);
-            border: 1px solid rgba(148, 163, 184, 0.4);
-            font-size: 13px;
-            color: #e5e7eb;
-        }
-
-        .chat-shell {
-            background: rgba(15, 23, 42, 0.88);
-            border-radius: 24px;
-            border: 1px solid rgba(148, 163, 184, 0.35);
-            box-shadow:
-                0 24px 60px rgba(15, 23, 42, 0.85),
-                0 0 0 1px rgba(15, 23, 42, 0.8);
-            backdrop-filter: blur(18px);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        .chat-header {
-            padding: 16px 18px;
-            border-bottom: 1px solid rgba(55, 65, 81, 0.9);
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .chat-header-avatar {
-            width: 32px;
-            height: 32px;
-            border-radius: 16px;
-            background: radial-gradient(circle at 30% 0, #facc15, #ea580c 55%, #7c3aed 100%);
-        }
-
-        .chat-header-text {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-
-        .chat-header-title {
-            font-size: 15px;
-            font-weight: 600;
-            color: #f9fafb;
-        }
-
-        .chat-header-subtitle {
-            font-size: 12px;
-            color: #9ca3af;
-        }
-
-        .messages {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px 18px;
-            display: flex;
-            flex-direction: column;
-            gap: 14px;
-            background: radial-gradient(circle at top, rgba(15, 23, 42, 0.85), rgba(15, 23, 42, 1));
-            scrollbar-width: thin;
-            scrollbar-color: #4f46e5 #020617;
-        }
-
-        .messages::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .messages::-webkit-scrollbar-track {
-            background: #020617;
-        }
-
-        .messages::-webkit-scrollbar-thumb {
-            background: #4f46e5;
-            border-radius: 3px;
-        }
-
-        .message {
-            display: flex;
-            gap: 10px;
-            animation: fadeIn 0.25s ease-out;
-        }
-
-        .message.user {
-            justify-content: flex-end;
-        }
-
-        .message-bubble {
-            max-width: 72%;
-            padding: 11px 14px;
-            border-radius: 18px;
-            line-height: 1.5;
-            word-wrap: break-word;
-            font-size: 14px;
-        }
-
-        .message.bot .message-bubble {
-            background: rgba(31, 41, 55, 0.96);
-            color: #e5e7eb;
-            border-bottom-left-radius: 4px;
-        }
-
-        .message.user .message-bubble {
-            background: linear-gradient(135deg, #8b5cf6, #ec4899);
-            color: #fdf2f8;
-            border-bottom-right-radius: 4px;
-            box-shadow: 0 10px 30px rgba(168, 85, 247, 0.4);
-        }
-
-        .message-bubble.error {
-            background: #fee2e2;
-            color: #b91c1c;
-            border: 1px solid #fecaca;
-        }
-
-        .hotel-card {
-            display: grid;
-            grid-template-columns: 120px minmax(0, 1fr);
-            gap: 14px;
-            background: rgba(15, 23, 42, 0.98);
-            border: 1px solid rgba(148, 163, 184, 0.45);
-            border-radius: 18px;
-            padding: 12px;
-            cursor: pointer;
-            transition: transform 0.18s ease-out, box-shadow 0.18s ease-out, border-color 0.18s;
-            margin-top: 10px;
-        }
-
-        .hotel-card:hover {
-            transform: translateY(-2px) scale(1.01);
-            border-color: #a855f7;
-            box-shadow: 0 18px 45px rgba(15, 23, 42, 0.9);
-        }
-
-        .hotel-card img {
-            width: 120px;
-            height: 120px;
-            border-radius: 14px;
-            object-fit: cover;
-        }
-
-        .hotel-main {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        .hotel-name {
-            font-weight: 600;
-            font-size: 15px;
-            color: #f9fafb;
-        }
-
-        .hotel-meta {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 13px;
-            color: #9ca3af;
-        }
-
-        .hotel-price {
-            font-weight: 700;
-            color: #f97316;
-            font-size: 16px;
-        }
-
-        .hotel-rating {
-            padding: 2px 8px;
-            border-radius: 999px;
-            background: rgba(250, 204, 21, 0.12);
-            color: #facc15;
-            font-size: 12px;
-        }
-
-        .hotel-amenities {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            margin-top: 2px;
-        }
-
-        .amenity {
-            background: rgba(15, 23, 42, 0.9);
-            border-radius: 999px;
-            padding: 4px 9px;
-            font-size: 11px;
-            color: #9ca3af;
-        }
-
-        .book-btn {
-            margin-top: 6px;
-            align-self: flex-start;
-            padding: 6px 12px;
-            border-radius: 999px;
-            border: 1px solid rgba(148, 163, 184, 0.7);
-            background: transparent;
-            color: #e5e7eb;
-            font-size: 12px;
-            font-weight: 500;
-            text-decoration: none;
-            transition: background 0.15s ease, border-color 0.15s;
-        }
-
-        .book-btn:hover {
-            background: rgba(129, 140, 248, 0.25);
-            border-color: #818cf8;
-        }
-
-        .input-area {
-            padding: 12px 14px 14px;
-            border-top: 1px solid rgba(55, 65, 81, 0.9);
-            background: rgba(15, 23, 42, 0.98);
-            display: flex;
-            gap: 10px;
-        }
-
-        .input-field {
-            flex: 1;
-            padding: 10px 14px;
-            border-radius: 999px;
-            border: 1px solid rgba(55, 65, 81, 0.9);
-            background: rgba(15, 23, 42, 0.9);
-            color: #e5e7eb;
-            font-size: 14px;
-            font-family: inherit;
-        }
-
-        .input-field::placeholder {
-            color: #6b7280;
-        }
-
-        .input-field:focus {
-            outline: none;
-            border-color: #a855f7;
-            box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.7);
-        }
-
-        .send-btn {
-            background: linear-gradient(135deg, #a855f7, #ec4899);
-            color: white;
-            border: none;
-            width: 44px;
-            height: 44px;
-            border-radius: 999px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-            flex-shrink: 0;
-            box-shadow: 0 12px 28px rgba(168, 85, 247, 0.55);
-        }
-
-        .send-btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 16px 36px rgba(168, 85, 247, 0.65);
-        }
-
-        .send-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .loading {
-            display: flex;
-            gap: 6px;
-            padding: 8px 10px;
-        }
-
-        .dot {
-            width: 8px;
-            height: 8px;
-            background: linear-gradient(135deg, #8b5cf6, #ec4899);
-            border-radius: 50%;
-            animation: bounce 1.4s infinite;
-        }
-
-        .dot:nth-child(2) {
-            animation-delay: 0.25s;
-        }
-
-        .dot:nth-child(3) {
-            animation-delay: 0.5s;
-        }
-
-        @keyframes bounce {
-            0%, 80%, 100% {
-                transform: scale(0.8);
-                opacity: 0.6;
-            }
-            40% {
-                transform: scale(1.18);
-                opacity: 1;
-            }
-        }
-
-        /* Responsive */
-
-        @media (max-width: 880px) {
-            .container {
-                grid-template-columns: minmax(0, 1fr);
-                max-width: 720px;
-            }
-            .hero {
-                order: 2;
-                text-align: center;
-                align-items: center;
-                padding-top: 16px;
-            }
-            .hero-subtitle {
-                max-width: none;
-            }
-        }
-
-        @media (max-width: 640px) {
-            body {
-                padding: 12px;
-            }
-
-            .chat-shell {
-                border-radius: 18px;
-            }
-
-            .chat-header {
-                padding: 12px 14px;
-            }
-
-            .messages {
-                padding: 14px 12px;
-                gap: 10px;
-            }
-
-            .message-bubble {
-                max-width: 88%;
-                font-size: 13px;
-                padding: 9px 11px;
-            }
-
-            .input-area {
-                padding: 10px 10px 11px;
-                gap: 8px;
-            }
-
-            .input-field {
-                font-size: 13px;
-                padding: 9px 12px;
-            }
-
-            .send-btn {
-                width: 40px;
-                height: 40px;
-                font-size: 16px;
-                box-shadow: 0 8px 18px rgba(168, 85, 247, 0.55);
-            }
-
-            .hotel-card {
-                grid-template-columns: 100px minmax(0, 1fr);
-                padding: 10px;
-                gap: 10px;
-            }
-
-            .hotel-card img {
-                width: 100px;
-                height: 100px;
-            }
-
-            .hotel-name {
-                font-size: 14px;
-            }
-
-            .hotel-price {
-                font-size: 15px;
-            }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hotelix</title>
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      background: radial-gradient(circle at top, #8b5cf6 0, #0f172a 55%, #020617 100%);
+      min-height: 100vh;
+      color: #e5e7eb;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .hero {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .hero-title {
+      font-size: 56px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+    }
+
+    .hero-subtitle {
+      font-size: 18px;
+      max-width: 520px;
+      line-height: 1.6;
+      color: #e5e7eb;
+    }
+
+    .chat-shortcut {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      width: 60px;
+      height: 60px;
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      background: radial-gradient(circle at 30% 0, #8b5cf6, #ec4899 60%, #22c55e 100%);
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #f9fafb;
+      font-size: 26px;
+      z-index: 40;
+    }
+
+    .chat-shortcut:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 22px 48px rgba(15, 23, 42, 0.9);
+    }
+
+    .chat-shortcut-label {
+      position: absolute;
+      right: 70px;
+      background: rgba(15, 23, 42, 0.96);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 13px;
+      color: #e5e7eb;
+      border: 1px solid rgba(55, 65, 81, 0.9);
+      white-space: nowrap;
+    }
+
+    @media (max-width: 640px) {
+      .hero-title { font-size: 42px; }
+      .hero-subtitle { font-size: 16px; }
+    }
+  </style>
 </head>
 <body>
-<main class="container" role="main">
-    <section class="hero" aria-label="Présentation de Hotelix">
-        <h1 class="hero-title">🏨 Hotelix</h1>
-        <p class="hero-subtitle">
-            Trouvez en quelques messages les meilleurs hôtels adaptés à votre budget, vos dates et votre style de voyage.
-        </p>
-        <div class="hero-badges">
-            <div class="hero-badge">⭐ 4,8/5 basé sur 1 200+ avis</div>
-            <div class="hero-badge">🔍 Comparaison intelligente des prix</div>
-            <div class="hero-badge">⚡ Recommandations en temps réel</div>
-        </div>
-    </section>
+  <main class="hero" role="main">
+    <h1 class="hero-title">HOTELIX</h1>
+    <p class="hero-subtitle">
+      Votre assistant intelligent pour trouver rapidement les meilleurs hôtels au bon prix.
+    </p>
+  </main>
 
-    <section class="chat-shell" aria-label="Chat Hotelix">
-        <header class="chat-header">
-            <div class="chat-header-avatar"></div>
-            <div class="chat-header-text">
-                <span class="chat-header-title">Assistant Hotelix</span>
-                <span class="chat-header-subtitle">En ligne • Réponse en quelques secondes</span>
-            </div>
-        </header>
+  <!-- Bouton flottant -->
+  <button
+    class="chat-shortcut"
+    type="button"
+    aria-label="Ouvrir l’assistant Hotelix"
+    onclick="openHotelixAssistant()">
+    💬
+    <span class="chat-shortcut-label">Assistant Hotelix</span>
+  </button>
 
-        <section class="messages" id="messages" aria-live="polite" role="log" aria-label="Messages du chat"></section>
-
-        <footer class="input-area">
-            <label for="messageInput" class="sr-only">Tapez votre message</label>
-            <input
-                type="text"
-                id="messageInput"
-                class="input-field"
-                placeholder="Tapez votre message..."
-                autocomplete="off"
-                aria-describedby="sendBtn"
-            />
-            <button id="sendBtn" class="send-btn" aria-label="Envoyer le message">
-                ➤
-            </button>
-        </footer>
-    </section>
-</main>
-
-<!-- JS reste dans hotelix.js -->
-<script src="hotelix.js"></script>
+  <!-- Lien vers ton fichier JavaScript -->
+  <script src="hotelix.js" defer></script>
+  <!-- Si le fichier est dans un sous-dossier, adapte le chemin, ex : src="js/hotelix.js" -->
 </body>
 </html>
-

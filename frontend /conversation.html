@@ -1,1 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hotelix AI | Your Personal Concierge</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0f0f0f;
+            --glass: rgba(255, 255, 255, 0.03);
+            --gold-gradient: linear-gradient(135deg, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c);
+        }
 
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
+
+        body { background: var(--bg-dark); color: white; height: 100vh; display: flex; flex-direction: column; }
+
+        /* Assistant Header */
+        header {
+            padding: 20px 5%;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(10px);
+        }
+
+        .back-link { color: rgba(255,255,255,0.5); text-decoration: none; font-size: 0.9rem; }
+        .back-link:hover { color: white; }
+
+        /* Chat Area */
+        #chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 40px 15%;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+
+        .msg { max-width: 70%; padding: 20px; border-radius: 20px; line-height: 1.6; font-size: 1.1rem; }
+        
+        .bot { 
+            background: var(--glass); 
+            border: 1px solid rgba(255,255,255,0.05);
+            align-self: flex-start;
+            border-bottom-left-radius: 2px;
+        }
+
+        .user { 
+            background: var(--gold-gradient); 
+            color: #2a1e06; 
+            align-self: flex-end; 
+            font-weight: 600;
+            border-bottom-right-radius: 2px;
+        }
+
+        /* Input Area */
+        .input-wrapper {
+            padding: 40px 15%;
+            background: linear-gradient(transparent, var(--bg-dark));
+        }
+
+        .input-box {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 20px;
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: white;
+            padding: 15px;
+            font-size: 1.1rem;
+            outline: none;
+        }
+
+        .send-btn {
+            background: var(--gold-gradient);
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div>
+            <h2 style="font-size: 1.2rem; letter-spacing: 1px;">HOTELIX INTELLIGENCE</h2>
+            <p style="font-size: 0.8rem; color: #aa771c;">Exclusive Concierge Access</p>
+        </div>
+        <a href="hotelix.html" class="back-link">✕ Exit Assistant</a>
+    </header>
+
+    <main id="chat-container">
+        <div class="msg bot">
+            Welcome back. I am your Hotelix Intelligence. <br><br>
+            Describe the experience you are looking for—whether it's a secluded villa in the Maldives or a penthouse in New York—and I will curate the perfect stay for you.
+        </div>
+    </main>
+
+    <div class="input-wrapper">
+        <div class="input-box">
+            <input type="text" id="user-input" placeholder="Where should we take you next?">
+            <button class="send-btn" onclick="processChat()">➔</button>
+        </div>
+    </div>
+
+    <script src="hotelix.jv"></script>
+</body>
+</html>

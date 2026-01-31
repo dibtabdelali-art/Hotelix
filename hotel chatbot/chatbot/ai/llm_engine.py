@@ -7,6 +7,7 @@ try:
 except Exception:
     requests = None
 import os
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +94,15 @@ class ChatbotAIEngine:
 
             try:
                 parsed = json.loads(response_text)
+                # If LLM didn't extract a location, try a geocoding fallback
+                if not parsed.get('location'):
+                    # attempt to resolve a city from the raw user message
+                    try:
+                        resolved = self.geocode_city(user_message)
+                        if resolved:
+                            parsed['location'] = resolved
+                    except Exception:
+                        pass
                 return parsed
             except json.JSONDecodeError:
                 logger.error("JSON parse error from LLM response: %s", response_text)
@@ -167,6 +177,51 @@ class ChatbotAIEngine:
             return "Erreur réseau lors de la communication avec Makcorps."
 
 
+    def geocode_city(self, text: str) -> Optional[str]:
+        """Try to detect a city name from free text using Nominatim (OpenStreetMap).
+
+        Returns a normalized city name (string) or None.
+        This is a best-effort fallback when the LLM doesn't extract a location.
+        """
+        if not text or not requests:
+            return None
+
+        # Simple rate-limit friendly usage
+        base = 'https://nominatim.openstreetmap.org/search'
+        params = {
+            'q': text,
+            'format': 'json',
+            'addressdetails': 1,
+            'limit': 3,
+        }
+        headers = {'User-Agent': 'hotel_chatbot/1.0 (+https://example.com)'}
+        try:
+            resp = requests.get(base, params=params, headers=headers, timeout=5)
+            if resp.status_code != 200:
+                return None
+            data = resp.json()
+            # prefer an entry with type 'city' or 'town'
+            for entry in data:
+                typ = entry.get('type') or ''
+                addr = entry.get('address') or {}
+                if typ in ('city', 'town', 'village') or addr.get('city') or addr.get('town') or addr.get('village'):
+                    # prefer the city field if available
+                    city = addr.get('city') or addr.get('town') or addr.get('village')
+                    if city:
+                        return city
+
+            # fallback: take first result's display_name and extract first token
+            if data:
+                first = data[0]
+                # common display_name format: "City, Region, Country"
+                display = first.get('display_name') or ''
+                if display:
+                    return display.split(',')[0].strip()
+        except Exception:
+            return None
+        return None
+
+
     def orchestrate_response(self, user_message: str) -> Dict[str, Any]:
         """High-level orchestration: parse intent, run GROQ if needed, call Makcorps to produce a reply.
 
@@ -210,12 +265,21 @@ class ChatbotAIEngine:
             lines: List[str] = [f"J'ai trouvé {len(recommendations)} excellents hôtels ! Voici les meilleurs :"]
             for i, hotel in enumerate(recommendations[:5], 1):
                 name = hotel.get('name', '—')
-                rating = hotel.get('rating', 'N/A')
-                price = hotel.get('price_per_night', 'N/A')
+                rating = hotel.get('rating')
+                # ensure rating displayed as 0-5 scale
+                if rating is None:
+                    rating_display = 'N/A'
+                else:
+                    try:
+                        rating_display = f"{float(rating):.1f}"
+                    except Exception:
+                        rating_display = str(rating)
+
+                price = hotel.get('price_str') or hotel.get('price_per_night') or hotel.get('price') or 'N/A'
                 location = hotel.get('location', '—')
                 url = hotel.get('affiliate_url') or hotel.get('url') or ''
 
-                lines.append(f"{i}. {name} — ⭐ {rating}/10")
+                lines.append(f"{i}. {name} — ⭐ {rating_display}/5")
                 lines.append(f"    {price}€/nuit — {location}")
                 if url:
                     lines.append(f"    Réserver : {url}")

@@ -7,6 +7,17 @@ import re
 logger = logging.getLogger(__name__)
 
 
+def _parse_price(price_val):
+    if price_val is None:
+        return None
+    try:
+        p = str(price_val)
+        p_clean = re.sub(r"[^0-9,\.]", "", p).replace(',', '.')
+        return float(p_clean)
+    except Exception:
+        return None
+
+
 class MakcorpsClient:
     """Client for Makcorps hotel APIs (city/hotel/mapping).
 
@@ -14,7 +25,7 @@ class MakcorpsClient:
     documented endpoints: `/mapping`, `/city`, `/hotel`, `/booking`, `/expedia`.
     """
 
-    def __init__(self, base_url: Optional[str] = None, api_key: Optional[str] = None, timeout: int = 10):
+    def __init__(self, base_url: Optional[str] = None, api_key: Optional[str] = None, timeout: int = 30):
         self.base_url = (base_url or os.getenv('MAKCORPS_BASE_URL', 'https://api.makcorps.com')).rstrip('/')
         self.api_key = api_key or os.getenv('MAKCORPS_API_KEY')
         self.timeout = timeout
@@ -25,7 +36,7 @@ class MakcorpsClient:
         url = f"{self.base_url}/{path.lstrip('/')}"
         try:
             resp = requests.get(url, params=params, timeout=self.timeout)
-            # don't raise; capture body for better diagnostics
+            # raise on non-200 so callers can handle errors explicitly
             if resp.status_code != 200:
                 body = None
                 try:
@@ -33,20 +44,23 @@ class MakcorpsClient:
                 except Exception:
                     body = '<unreadable body>'
                 logger.error('Makcorps request failed: %s %s %s', url, resp.status_code, body)
-                # also print to stdout so interactive REPL shows it
                 try:
                     print(f"Makcorps request failed: {url} {resp.status_code} {body}")
                 except Exception:
                     pass
-                return None
-            return resp.json()
+                # raise a descriptive exception so higher layers can surface it to users
+                raise MakcorpsAPIError(url=url, status=resp.status_code, body=body)
+            try:
+                return resp.json()
+            except ValueError:
+                return resp.text
         except requests.RequestException as e:
             logger.error('Makcorps request failed: %s %s', url, e)
             try:
                 print(f"Makcorps request failed: {url} {e}")
             except Exception:
                 pass
-            return None
+            raise MakcorpsAPIError(url=url, status=None, body=str(e))
 
     def mapping(self, name: str) -> List[Dict]:
         """Call mapping API to resolve city/hotel names to Makcorps IDs."""
@@ -114,18 +128,50 @@ class MakcorpsClient:
                     price_value = None
 
             normalized.append({
+                'id': item.get('hotelId') or item.get('value') or item.get('document_id'),
+                'booking_id': item.get('hotelId') or item.get('value') or item.get('document_id'),
+                'name': item.get('name') or item.get('hotel_name') or item.get('vendor'),
                 'vendor_name': item.get('name'),
                 'hotel_id': item.get('hotelId') or item.get('value') or item.get('document_id'),
                 'price_str': price,
                 'price': price_value,
+                'price_per_night': price_value,
                 'total_price': None,
                 'rating': rating,
                 'rating_raw': rating,
+                'rating_count': (item.get('reviews') or {}).get('count') if isinstance(item.get('reviews'), dict) else None,
                 'location': item.get('parent_name') or item.get('location') or None,
                 'telephone': item.get('telephone'),
                 'affiliate_url': None,
                 'raw': item,
             })
+        # attempt to enrich items missing a numeric price by querying hotel offers
+        for h in normalized:
+            if (h.get('price') is None or h.get('price_per_night') is None) and h.get('hotel_id'):
+                try:
+                    offer = self.get_best_offer_for_hotel(h.get('hotel_id'), checkin, checkout, adults)
+                    if offer:
+                        h['price'] = offer.get('price')
+                        h['price_per_night'] = offer.get('price')
+                        h['price_str'] = offer.get('price_str') or h.get('price_str')
+                        # prefer vendor name from offer
+                        if offer.get('vendor'):
+                            h['vendor_name'] = offer.get('vendor')
+                            if not h.get('name'):
+                                h['name'] = offer.get('vendor')
+                        if offer.get('affiliate_url'):
+                            h['affiliate_url'] = offer.get('affiliate_url')
+                except Exception:
+                    # don't fail the whole search if enrichment fails
+                    logger.debug('Failed to enrich hotel %s with offers', h.get('hotel_id'))
+                    pass
+
+        # ensure string fields are not None
+        for h in normalized:
+            for k in ('name', 'vendor_name', 'location', 'affiliate_url'):
+                if h.get(k) is None:
+                    h[k] = ''
+
         return normalized
 
     def search_by_hotel_id(self, hotelid: int, checkin: str, checkout: str, adults: int = 2, rooms: int = 1, currency: str = 'EUR') -> List[Dict]:
@@ -177,16 +223,39 @@ class MakcorpsClient:
         normalized = []
         for r in results:
             normalized.append({
-                'vendor_name': r.get('vendor'),
+                'id': hotelid,
+                'booking_id': hotelid,
+                'name': r.get('vendor') or r.get('name') or '',
+                'vendor_name': r.get('vendor') or '',
                 'hotel_id': hotelid,
-                'price': r.get('price'),
+                'price': None if r.get('price') is None else _parse_price(r.get('price')),
+                'price_per_night': None if r.get('price') is None else _parse_price(r.get('price')),
                 'total_price': None,
                 'rating': None,
+                'rating_count': None,
                 'location': None,
                 'affiliate_url': None,
                 'raw': r.get('raw'),
             })
         return normalized
+
+    def get_best_offer_for_hotel(self, hotelid: int, checkin: str, checkout: str, adults: int = 2) -> Optional[Dict]:
+        """Query the hotel comparison endpoint and return the cheapest vendor offer.
+
+        Returns dict: { 'price': float, 'price_str': str, 'vendor': str, 'affiliate_url': str }
+        """
+        try:
+            offers = self.search_by_hotel_id(hotelid, checkin, checkout, adults=adults)
+            best = None
+            for o in offers:
+                p = o.get('price')
+                if p is None:
+                    continue
+                if best is None or (p < best.get('price')):
+                    best = {'price': p, 'price_str': f"€{int(round(p))}", 'vendor': o.get('vendor_name') or o.get('name') or '', 'affiliate_url': o.get('affiliate_url') or ''}
+            return best
+        except Exception:
+            return None
 
     def booking(self, country: str, hotelid: str, checkin: str, checkout: str, currency: str = 'EUR', kids: int = 0, adults: int = 1, rooms: int = 1) -> Optional[object]:
         params = {
@@ -232,9 +301,80 @@ class MakcorpsClient:
             pass
 
         # Try to resolve city id via mapping
-        city_id = self._choose_id_from_mapping(location)
-        if city_id:
-            return self.search_by_city_id(city_id, check_in, check_out, adults=guests, currency='EUR')
+        try:
+            city_id = self._choose_id_from_mapping(location)
+            if city_id:
+                logger.info(f"Resolved {location} to city ID {city_id}")
+                return self.search_by_city_id(city_id, check_in, check_out, adults=guests, currency='EUR')
+        except MakcorpsAPIError as e:
+            logger.error(f"Mapping API failed for {location}: {e}")
+            # Mapping failed - raise with helpful message
+            raise MakcorpsAPIError(
+                url=e.url, 
+                status=e.status, 
+                body=f"Unable to find city '{location}'. The Makcorps mapping service is unavailable. Please contact support or try again later."
+            )
+        except Exception as e:
+            logger.exception(f"Unexpected error during mapping lookup for {location}")
+            raise
+
+        # Fallback: try calling city endpoint directly by name (some Makcorps deployments support this)
+        try:
+            params = {
+                'name': location,
+                'checkin': check_in,
+                'checkout': check_out,
+                'adults': guests,
+                'cur': 'EUR'
+            }
+            data = self._get('/city', params)
+            if data and isinstance(data, list):
+                # reuse the same normalization as search_by_city_id
+                normalized = []
+                for item in data:
+                    if not isinstance(item, dict):
+                        continue
+                    price = None
+                    for i in range(1, 11):
+                        p = item.get(f'price{i}')
+                        if p:
+                            price = p
+                            break
+
+                    rating = None
+                    reviews = item.get('reviews') or {}
+                    rating = reviews.get('rating') if isinstance(reviews, dict) else None
+
+                    price_value = None
+                    if price:
+                        p = str(price)
+                        p_clean = re.sub(r"[^0-9,\.]", "", p).replace(',', '.')
+                        try:
+                            price_value = float(p_clean)
+                        except Exception:
+                            price_value = None
+
+                    normalized.append({
+                        'id': item.get('hotelId') or item.get('value') or item.get('document_id'),
+                        'booking_id': item.get('hotelId') or item.get('value') or item.get('document_id'),
+                        'name': item.get('name') or item.get('hotel_name') or item.get('vendor'),
+                        'vendor_name': item.get('name'),
+                        'hotel_id': item.get('hotelId') or item.get('value') or item.get('document_id'),
+                        'price_str': price,
+                        'price': price_value,
+                        'price_per_night': price_value,
+                        'total_price': None,
+                        'rating': rating,
+                        'rating_raw': rating,
+                        'rating_count': (item.get('reviews') or {}).get('count') if isinstance(item.get('reviews'), dict) else None,
+                        'location': item.get('parent_name') or item.get('location') or None,
+                        'telephone': item.get('telephone'),
+                        'affiliate_url': None,
+                        'raw': item,
+                    })
+                return normalized
+        except Exception:
+            pass
 
         # As fallback, try hotel endpoint with name slug (some endpoints accept hotelid as slug)
         data = self._get('/booking', {'country': '', 'hotelid': location, 'checkin': check_in, 'checkout': check_out, 'currency': 'EUR', 'adults': guests, 'rooms': 1})
@@ -245,12 +385,19 @@ class MakcorpsClient:
                 rooms = data[0] if isinstance(data[0], list) else []
                 hotel_meta = data[1] if len(data) > 1 else {}
                 for room in rooms:
+                    price_val = room.get('price')
+                    pv = _parse_price(price_val)
                     normalized.append({
+                        'id': hotel_meta.get('hotelid') or None,
+                        'booking_id': hotel_meta.get('hotelid') or None,
+                        'name': hotel_meta.get('name') or location,
                         'vendor_name': hotel_meta.get('name') or location,
                         'hotel_id': hotel_meta.get('hotelid') or None,
-                        'price': room.get('price'),
+                        'price': pv,
+                        'price_per_night': pv,
                         'total_price': None,
                         'rating': None,
+                        'rating_count': None,
                         'location': hotel_meta.get('address'),
                         'affiliate_url': None,
                         'raw': room,
@@ -262,3 +409,12 @@ class MakcorpsClient:
 
 def default_client() -> MakcorpsClient:
     return MakcorpsClient()
+
+
+class MakcorpsAPIError(Exception):
+    def __init__(self, url: str = '', status: Optional[int] = None, body: Optional[str] = None):
+        self.url = url
+        self.status = status
+        self.body = body
+        msg = f"Makcorps API error {status} for {url}: {body}"
+        super().__init__(msg)

@@ -5,81 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hotelix | Luxury Bookings</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --glass: rgba(255, 255, 255, 0.1);
-            --gold-gradient: linear-gradient(135deg, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c);
-        }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
-        
-        body { background: #0a0a0a; color: white; height: 100vh; overflow: hidden; }
-
-        .bg-wrapper {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.6)), 
-                        url('https://images.unsplash.com/photo-1571896349842-33c89424de2d?q=80&w=1920&auto=format&fit=crop');
-            background-size: cover; background-position: center; z-index: -1;
-        }
-
-        nav { padding: 30px 8%; display: flex; justify-content: space-between; align-items: center; }
-        .logo { font-size: 1.8rem; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: #fff; text-decoration: none; }
-
-        .btn-outline {
-            background: var(--glass);
-            border: 1px solid rgba(255,255,255,0.3);
-            color: white;
-            padding: 12px 24px;
-            border-radius: 10px;
-            cursor: pointer;
-            backdrop-filter: blur(10px);
-            text-decoration: none;
-            font-weight: 600;
-        }
-
-        .hero { height: 80vh; display: flex; justify-content: center; align-items: center; }
-        .glass-card {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(25px);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 30px;
-            padding: 80px 60px;
-            text-align: center;
-            max-width: 800px;
-        }
-
-        h1 { font-size: 4rem; font-weight: 800; margin-bottom: 20px; line-height: 1.1; }
-        p { font-size: 1.3rem; color: rgba(255,255,255,0.8); margin-bottom: 40px; }
-
-        .main-cta {
-            background: var(--gold-gradient);
-            border: none;
-            padding: 20px 45px;
-            border-radius: 15px;
-            font-size: 1.2rem;
-            font-weight: 700;
-            color: #2a1e06;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
-            transition: 0.3s;
-        }
-        .main-cta:hover { transform: scale(1.05); }
-    </style>
+    <link rel="stylesheet" href="../static/css/style.css">
 </head>
 <body>
     <div class="bg-wrapper"></div>
     <nav>
-        <a href="hotelix.html" class="logo">HOTELIX</a>
-        <a href="chatbot.html" class="btn-outline">✨ AI Concierge</a>
+        <a href="chatbot.html" class="logo">HOTELIX</a>
     </nav>
     <main class="hero">
         <div class="glass-card">
             <h1>Find a room.<br>Discover a memory.</h1>
             <p>Personalized stays curated by intelligence.</p>
-            <a href="chatbot.html" class="main-cta">✨ Plan my trip with AI</a>
+            <a href="coversation.html" class="main-cta">✨ Plan my trip with AI</a>
         </div>
     </main>
+    <script src="../static/js/chatbot.js"></script>
 </body>
 </html>

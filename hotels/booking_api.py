@@ -8,8 +8,11 @@ for commission tracking.
 
 import logging
 import requests
+import os
 from typing import List, Dict, Optional
 from django.conf import settings
+from chatbot.ai.makcorps_client import default_client
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +22,17 @@ class BookingAPIClient:
     
     def __init__(self):
         """Initialize booking API client."""
-        self.base_url = settings.BOOKING_API_BASE_URL
-        self.api_key = settings.BOOKING_API_KEY
+        try:
+            self.base_url = settings.BOOKING_API_BASE_URL
+        except Exception:
+            self.base_url = os.getenv('BOOKING_API_BASE_URL', '')
+            logger.warning('BOOKING_API_BASE_URL not in Django settings; falling back to env var')
+
+        try:
+            self.api_key = settings.BOOKING_API_KEY
+        except Exception:
+            self.api_key = os.getenv('BOOKING_API_KEY', '')
+            logger.warning('BOOKING_API_KEY not in Django settings; falling back to env var')
         self.timeout = 10
     
     def search_hotels(
@@ -65,17 +77,16 @@ class BookingAPIClient:
                 'Content-Type': 'application/json',
             }
             
-            # TODO: Implement actual API call to booking service
-            # response = requests.get(
-            #     f'{self.base_url}/search',
-            #     params=params,
-            #     headers=headers,
-            #     timeout=self.timeout
-            # )
-            # response.raise_for_status()
-            # return response.json()
-            
-            logger.info(f"Searched hotels in {location}")
+            # If Makcorps is configured, use it as a live source
+            mak_client = default_client()
+            mak_base = mak_client.base_url
+            mak_key = mak_client.api_key
+            if mak_base and mak_key:
+                logger.info('Using Makcorps client for hotel search')
+                return mak_client.search_hotels(location, check_in, check_out, guests, max_price, amenities)
+
+            # TODO: Implement other booking provider API calls here
+            logger.info(f"Searched hotels in {location} (no external provider configured)")
             return []
             
         except requests.RequestException as e:
@@ -130,3 +141,7 @@ class BookingAPIClient:
         except requests.RequestException as e:
             logger.error(f"Error getting hotel details: {str(e)}")
             return None
+
+
+# Compatibility alias used by interactive tools in the project
+BookingSearchClient = BookingAPIClient
